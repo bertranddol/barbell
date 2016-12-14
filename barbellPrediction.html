@@ -156,8 +156,7 @@ dim(training)</code></pre>
 <pre><code>## [1] 19622   160</code></pre>
 <pre class="r"><code>dim(testing)</code></pre>
 <pre><code>## [1]  20 160</code></pre>
-<pre class="r"><code>#data(mtcars)
-df &lt;- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$yaw_belt , training$classe)
+<pre class="r"><code>df &lt;- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$yaw_belt , training$classe)
 
 training[is.na( training )] &lt;- 0
 
