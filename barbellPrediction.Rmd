@@ -36,6 +36,9 @@ dim(testing)
 #data(mtcars)
 df <- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$accel_forearm_y ,training$kurtosis_picth_belt, training$yaw_belt , training$classe)
 
+df <- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$yaw_belt , training$classe)
+>>>>>>> master
+
 training[is.na( training )] <- 0
 
 #mcor <- cor( mtcars )
