@@ -1,62 +1,259 @@
 ---
-title: "Untitled"
+title: "Dumbbell workout efficiency analysis"
 author: "Bertrand Dolimier"
-date: "10/26/2016"
+date: "12/14/2016"
 output:
   html_document: default
   pdf_document: default
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. 
+  
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.  
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Approach: We will split the training dataset into a "real" training and validation datasets. Will explore liner regression as a method to resolve the testing dataset (even if all indicators lead us to believe this is a classification problem). If LR is not conclusive we will still use result to select the fields correlated with the "classe" field to apply to the subsequent methods. We will then try Tree, Random Forest, Bagging and Boosting, we will keep the method with best accuracy results on the validation dataset and apply that method on the testing dataset for final prediction.
 
-#Claret Notes:
-* preProcess (cleaning)
-* createDataPartition (data splitting)
-* createResample (data splitting)
-* createTimeSlices (data splitting)
-* train (train/test function)
-* predict (train/test function)
-* confusionMatrix ( model comparison )
 
-```{r}
+# Libraries / Loading raw data / Inititiatization 
+We will split the training dataset into a training of 10% and validation 90%
+```{r , echo=FALSE}
 library(ggplot2)
 library(lattice)
 library( caret )
 library(kernlab)
-#library(aod)
 library(corrplot)
-#library(GGally)
+library(dplyr)
+library(rpart)
+library(party)
+library(mboost)
 
-training = read.csv("./pml-training.csv")
-testing = read.csv("./pml-testing.csv")
-dim(training)
-dim(testing)
-#data(mtcars)
-df <- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$accel_forearm_y ,training$kurtosis_picth_belt, training$yaw_belt , training$classe)
+CSVtraining = read.csv("../pml-training.csv" , na.strings=c("NA","#DIV/0!","") )
+testing = read.csv("../pml-testing.csv" , na.strings=c("NA","#DIV/0!","") )
+inTrain <- createDataPartition(y=CSVtraining$classe,
+                              p=0.1, list=FALSE)
+training <- CSVtraining[inTrain,]
+validation <- CSVtraining[-inTrain,]
 
-df <- cbind( training$raw_timestamp_part_1 , training$raw_timestamp_part_2 , training$yaw_belt , training$classe)
->>>>>>> master
-
-training[is.na( training )] <- 0
-
-#mcor <- cor( mtcars )
-mcor <- cor( df )
-
-corrplot.mixed( mcor , tl.col="black", tl.srt=25)
-
-#plot(train$waiting , train$eruptions , pch=19 , col='red', xlab="Waiting" , ylab = "Eruption" )
-
-
-# create training testing 75%
-#data(spam)
-#inTrain <- createDataPartition( y=spam$type, p=0.75, list=FALSE )
-#training <- spam[inTrain,]
-#testing <- spam[-inTrain,]
-
-
-
+#dim(CSVtraining)
+#dim(training)
+#dim(validation)
+#dim(testing)
 
 ```
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Linear Regression exploration  #
+Select training numeric fields not null and with minimum correlation with the classe column
+  Display plot to confirm fields selected are correlated
+
+We will first remove all fields with no significant values in the test dataset, then explore the correlation betwen the remaining fields and the classe field and keep on a selected fields. Listed in this code chunk.
+
+```{r corrplot, echo=FALSE}
+df <- cbind(
+  training["magnet_belt_y" ]	
+, training["magnet_belt_z" ]	
+, training["roll_arm" ]	
+, training["pitch_arm" ]	
+, training["yaw_arm" ]	
+, training["total_accel_arm" ]
+, training["accel_arm_x" ]	
+, training["accel_arm_y" ]	
+, training["accel_arm_z" ]	
+, training["magnet_arm_x" ]	
+, training["magnet_arm_y" ]	
+, training["magnet_arm_z" ]
+, training["pitch_forearm" ]
+, training["yaw_forearm" ]
+, training["total_accel_forearm" ]
+, training["gyros_forearm_x" ]
+, training["magnet_forearm_x" ]	
+, training["magnet_forearm_y" ]	
+ )
+
+# Make the factor classe column a numeric for linear analysis
+fac         <- as.factor( training$classe )
+df$classe   <- as.numeric(fac)
+
+# Substitute zero to null
+df[is.na( df )] <- 0
+df[is.null( df )] <- 0
+
+# Correlation plot
+mcor <- cor( df )
+corrplot.mixed( mcor , tl.col="black", tl.srt=25)
+```
+
+# Linear Regression plot
+The plot below clearly shows a correlation between the 15 combined predictors but also its predictive limitation as fit overlap is large accross all 5 classes.
+  As suspected, as classification model is far better appropriate.
+  
+```{r ,echo=FALSE}
+df <- cbind(
+  training["magnet_belt_y" ]	
+, training["magnet_belt_z" ]	
+, training["roll_arm" ]	
+, training["pitch_arm" ]	
+, training["yaw_arm" ]	
+, training["total_accel_arm" ]
+, training["accel_arm_x" ]	
+, training["accel_arm_y" ]	
+, training["accel_arm_z" ]	
+, training["magnet_arm_x" ]	
+, training["magnet_arm_y" ]	
+, training["magnet_arm_z" ]
+, training["pitch_forearm" ]
+, training["yaw_forearm" ]
+, training["total_accel_forearm" ]
+, training["gyros_forearm_x" ]
+, training["magnet_forearm_x" ]	
+, training["magnet_forearm_y" ]	
+ )
+fac         <- as.factor( training$classe )
+df$classe   <- as.numeric(fac)
+
+# Plot fitted value with classe
+fit <- lm( classe ~ ., df )
+plot( df$classe, fit$fitted,pch=19,col="blue",xlab="Class",ylab="Fit...")
+
+#boxplot(classnum ~ fit$fitted.values ,data=df, main="Dumb bell effectiveness Analysis", xlab="Average Pitch Belt", ylab="Classification")
+# Reset classe to its factor values
+df$classe <- training$classe
+
+```
+
+We selected 15 fields from the training dataset base on their correlation showed on the plot above.
+  That subset will be used as predictors for the methods below.
+  
+# Tree #  
+First method explore, the "tree" method aka "rpart" in the caret package.
+We find the accuracy between on the validation dataset to be 40% which clearly not satisfactory.
+```{r arbre, echo=FALSE}
+modFit <- train( classe ~  (
+  magnet_belt_y	
++ magnet_belt_z	
++ pitch_arm	
++ total_accel_arm
++ accel_arm_x	
++ accel_arm_y	
++ accel_arm_z	
++ magnet_arm_x	
++ magnet_arm_y	
++ magnet_arm_z
++ pitch_forearm
++ yaw_forearm
++ total_accel_forearm
++ magnet_forearm_x	
++ magnet_forearm_y )
+ ,data=df ,method="rpart")
+modFit
+
+# Predict on validation dataset
+validation[is.na( validation )] <- 0
+validation[is.null( validation )] <- 0
+pred <- predict(modFit, validation)
+table(pred==validation$classe,  validation$classe)
+table(pred,  validation$classe)
+
+#qplot( pred, validation$classe,colour=classe,data=validation)
+print(modFit$finalModel)
+```
+
+# Bagging #
+ Plot shows classe "A" (exercice done correctly) has the smallest range of fitted values, however classification of "bad" workout is not resolved.
+```{r bag, echo=FALSE}
+predictors  = data.frame(classe=df$classe)
+belts_measures = (
+  df$magnet_belt_y	
++ df$magnet_belt_z	
++ df$pitch_arm	
++ df$total_accel_arm
++ df$accel_arm_x	
++ df$accel_arm_y	
++ df$accel_arm_z	
++ df$magnet_arm_x	
++ df$magnet_arm_y	
++ df$magnet_arm_z
++ df$pitch_forearm
++ df$yaw_forearm
++ df$total_accel_forearm
++ df$magnet_forearm_x	
++ df$magnet_forearm_y )
+
+treebag <- bag(predictors, belts_measures, B = 10,
+                bagControl = bagControl(fit = ctreeBag$fit,
+                                        predict = ctreeBag$pred,
+                                        aggregate = ctreeBag$aggregate))
+
+plot(df$classe,belts_measures ,col='lightgrey',pch=19)
+
+```
+
+
+# Random Forest #
+Best model so far, has best accuracy.
+```{r, echo=FALSE}
+modFit <- train( classe ~ (
+  magnet_belt_y	
++ magnet_belt_z	
++ pitch_arm	
++ total_accel_arm
++ accel_arm_x	
++ accel_arm_y	
++ accel_arm_z	
++ magnet_arm_x	
++ magnet_arm_y	
++ magnet_arm_z
++ pitch_forearm
++ yaw_forearm
++ total_accel_forearm
++ magnet_forearm_x	
++ magnet_forearm_y )
+,data=df ,method="rf",prox=TRUE)
+modFit
+
+# Predict on validation dataset
+pred <- predict(modFit, validation)
+table(pred==validation$classe,  validation$classe)
+table(pred,  validation$classe)
+
+SVmodFit <- modFit
+```
+
+# Boosting #
+Accuracy of this method is below 50%, we shall not select this model.
+```{r boosting, echo=FALSE}
+modFit <- train( classe ~ 
+                   (
+  magnet_belt_y	
++ magnet_belt_z	
++ pitch_arm	
++ total_accel_arm
++ accel_arm_x	
++ accel_arm_y	
++ accel_arm_z	
++ magnet_arm_x	
++ magnet_arm_y	
++ magnet_arm_z
++ pitch_forearm
++ yaw_forearm
++ total_accel_forearm
++ magnet_forearm_x	
++ magnet_forearm_y )
+, method="gbm",data=training,verbose=FALSE)
+
+print(modFit)
+# Predict on validation dataset
+pred <- predict(modFit, validation)
+table(pred==validation$classe,  validation$classe)
+table(pred,  validation$classe)
+```
+
+# Result #
+We selected Random Forest as best model.
+Prediction results on the testing dataset are:
+```{r}
+# Predict on testing set
+testing[is.na( testing )] <- 0
+testing[is.null( testing )] <- 0
+pred <- predict(SVmodFit, testing)
+pred
+```
