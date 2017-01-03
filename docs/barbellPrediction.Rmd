@@ -16,7 +16,7 @@ Approach: We will split the training dataset into a "real" training and validati
 
 # Libraries / Loading raw data / Inititiatization 
 We will split the training dataset into a training of 10% and validation 90%
-```{r , echo=FALSE}
+```{r loading_libs, include=TRUE, warning=FALSE, message=FALSE}
 library(ggplot2)
 library(lattice)
 library( caret )
@@ -48,6 +48,11 @@ Select training numeric fields not null and with minimum correlation with the cl
 We will first remove all fields with no significant values in the test dataset, then explore the correlation betwen the remaining fields and the classe field and keep on a selected fields. Listed in this code chunk.
 
 ```{r corrplot, echo=FALSE}
+useColumns<-as.logical(!is.na(training[1,]))
+trainData<-training[,useColumns]
+nzv<- nearZeroVar(trainData,saveMetrics = TRUE)
+head(nzv)
+
 df <- cbind(
   training["magnet_belt_y" ]	
 , training["magnet_belt_z" ]	
